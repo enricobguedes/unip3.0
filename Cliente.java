@@ -1,5 +1,7 @@
 import java.io.IOException;
 import java.io.ObjectInputStream;
+import java.io.ObjectOutput;
+import java.io.ObjectOutputStream;
 import java.net.Socket;
 import java.net.UnknownHostException;
 import javax.swing.*;
@@ -16,26 +18,30 @@ public class Cliente {
     static boolean isConectado = true;
 
     // vars swing
-    protected static JButton botEnviar, botChecarConec;
+    protected static JButton botEnviar, botChecarConec, botReceberMensagens;
     protected static JScrollPane scroll;
     protected static JTextArea areaDeTexto;
-    protected static JLabel receberMensagens;
+    protected static JLabel checarConec, mensagemRecebida;
     protected static JPanel painelPrinc;
 
-    private static void aplicativo() {
+    private static void aplicativo(int width, int height) {
         JFrame janelaPrinc = new JFrame();
         janelaPrinc.setVisible(true);
-        janelaPrinc.setBounds(0, 0, 600, 1000);
+        janelaPrinc.setSize(width, height);
+        janelaPrinc.setTitle("maximizar a janela, por favor");
+        janelaPrinc.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
+        
 
         JPanel painelPrinc = new JPanel();
-        painelPrinc.setBounds(0, 0, 600, 1000);
-        painelPrinc.setBackground(new Color(0,0,0));
+        painelPrinc.setSize(1000, 1000);
+
 
         botEnviar = new JButton();
         botEnviar.setText("Enviar");
         botEnviar.addActionListener(new ActionListener() {
             public void actionPerformed (ActionEvent conex) {
-                enviar(areaDeTexto.getText());
+                String dadosRecebidos = enviar(areaDeTexto.getText());
+                mensagemRecebida.setText(dadosRecebidos);
             }
         });
         
@@ -44,17 +50,35 @@ public class Cliente {
         botChecarConec.setText("Check conexão");
         botChecarConec.addActionListener(new ActionListener() {
             public void actionPerformed (ActionEvent checkConex) {
-                enviar(areaDeTexto.getText());
+               testarConexao();
+               checarConec.setText(testarConexao());
             }
         });
 
+        botReceberMensagens = new JButton();
+        botReceberMensagens.setText("Reiniciar servidor");
+        botReceberMensagens.addActionListener(new ActionListener() {
+            public void actionPerformed (ActionEvent reiniciarServer) {
+                if ( isConectado == false) {
+                    server.inicServer();
+                } else {
+                    System.exit(0);
+                } 
+            }
+        });
         
-        receberMensagens = new JLabel();
-        receberMensagens.setSize(25, 10);
-        receberMensagens.setText(testarConexao());
+
+        
+        checarConec = new JLabel();
+        checarConec.setSize(100, 10);
+        checarConec.setText("");
+
+        mensagemRecebida = new JLabel();
+        mensagemRecebida.setSize(100, 10);
+        mensagemRecebida.setText("");
 
         areaDeTexto = new JTextArea();
-        areaDeTexto.setColumns(20);
+        areaDeTexto.setColumns(10);
         areaDeTexto.setRows(6);
 
         
@@ -66,7 +90,9 @@ public class Cliente {
         painelPrinc.add(botEnviar);
         painelPrinc.add(areaDeTexto);
         painelPrinc.add(botChecarConec);
-        painelPrinc.add(receberMensagens);
+        painelPrinc.add(checarConec);
+        painelPrinc.add(botReceberMensagens);
+        painelPrinc.add(mensagemRecebida);
         painelPrinc.add(scroll);
         
         janelaPrinc.setContentPane(painelPrinc);
@@ -75,10 +101,15 @@ public class Cliente {
 
     private static String testarConexao() {
         if (isConectado == true) {
-            return "conectado com sucesso";
+            return "Conectado com sucesso";
         }else {
             return "erro na conexão";
         }
+
+    }
+
+    private static String dadosRecebidos(String dadosConvertidos) {
+        return dadosConvertidos;
 
     }
 
@@ -87,16 +118,26 @@ public class Cliente {
 
         try {
             Socket cliente = new Socket("LocalHost", 34442);
+            ObjectOutputStream saidaDados = new ObjectOutputStream(cliente.getOutputStream());
+            saidaDados.flush();
+            saidaDados.writeObject(dadosOut);
+            
 
-            ObjectInputStream entradaDados = new ObjectInputStream(cliente.getInputStream());
+            Socket receber = new Socket("LocalHost", 40000);
+            ObjectInputStream entradaDados = new ObjectInputStream(receber.getInputStream());
             Object leitorDeDados = entradaDados.readObject();
             String dadosConvertidos = leitorDeDados.toString();
             System.out.println(dadosConvertidos);
-            cliente.close();
-            entradaDados.close();
+
+            
             areaDeTexto.setText("");
             isConectado = false;
-            return null;
+
+            entradaDados.close();
+            saidaDados.close();
+            receber.close();
+            cliente.close();
+            return dadosRecebidos(dadosConvertidos);
 
         } catch (UnknownHostException u) {
             System.out.println(u); 
@@ -109,10 +150,13 @@ public class Cliente {
         } catch (ClassNotFoundException cnf) {
             System.out.println(cnf);
             return null;
+        } finally {
+            
         }
     }
     public static void main(String[] args) throws Exception {
-        Cliente.aplicativo();
+        Cliente.aplicativo(1000,1000);
+        server.inicServer();
 
     }
 }
